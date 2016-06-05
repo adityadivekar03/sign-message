@@ -25,6 +25,8 @@ import logging
 import re
 import time
 
+from types import Signature, ChainStatus
+
 from dkim.canonicalization import (
     CanonicalizationPolicy,
     InvalidCanonicalizationPolicyError,
@@ -138,7 +140,7 @@ def hash_headers(hasher, canonicalize_headers, headers, include_headers,
         hasher.update(y)
     return sign_headers
 
-def validate_signature_fields(sig):
+def validate_signature_fields(sig, sign_type = Signature.dkim):
     """Validate DKIM-Signature fields.
 
     Basic checks for presence and correct formatting of mandatory fields.
@@ -146,26 +148,25 @@ def validate_signature_fields(sig):
 
     @param sig: A dict mapping field keys to values.
     """
-    mandatory_fields = (b'v', b'a', b'b', b'bh', b'd', b'h', b's')
+    if sign_type is Signature.dkim:
+        mandatory_fields = (b'v', b'a', b'b', b'bh', b'd', b'h', b's')
+    elif sign_type is Signature.ams:
+        mandatory_fields = (b'i', b'a', b'b', b'bh', b'd', b'h', b's')
+    elif sign_type is Signature.aseal:
+        mandatory_fields = (b'i', b'a', b'b', b'd', b's', b'cv')
     for field in mandatory_fields:
         if field not in sig:
             raise ValidationError("signature missing %s=" % field)
 
-    if sig[b'v'] != b"1":
+    if b'v' in sig and sig[b'v'] != b"1":
         raise ValidationError("v= value is not 1 (%s)" % sig[b'v'])
     if re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'b']) is None:
         raise ValidationError("b= value is not valid base64 (%s)" % sig[b'b'])
-    if re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'bh']) is None:
+    if b'bh' in sig and re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'bh']) is None:
         raise ValidationError(
             "bh= value is not valid base64 (%s)" % sig[b'bh'])
     # Nasty hack to support both str and bytes... check for both the
     # character and integer values.
-    if b'i' in sig and (
-        not sig[b'i'].lower().endswith(sig[b'd'].lower()) or
-        sig[b'i'][-len(sig[b'd'])-1] not in ('@', '.', 64, 46)):
-        raise ValidationError(
-            "i= domain is not a subdomain of d= (i=%s d=%s)" %
-            (sig[b'i'], sig[b'd']))
     if b'l' in sig and re.match(br"\d{,76}$", sig[b'l']) is None:
         raise ValidationError(
             "l= value is not a decimal integer (%s)" % sig[b'l'])
@@ -182,19 +183,6 @@ def validate_signature_fields(sig):
         if t_sign > now + slop:
             raise ValidationError(
         	"t= value is in the future (%s)" % sig[b't'])
-    if b'x' in sig:
-        if re.match(br"\d+$", sig[b'x']) is None:
-            raise ValidationError(
-                "x= value is not a decimal integer (%s)" % sig[b'x'])
-        x_sign = int(sig[b'x'])
-        if x_sign < now - slop:
-            raise ValidationError(
-        	"x= value is past (%s)" % sig[b'x'])
-        if x_sign < t_sign:
-            raise ValidationError(
-                "x= value is less than t= value (x=%s t=%s)" %
-                (sig[b'x'], sig[b't']))
-
 
 def rfc822_parse(message):
     """Parse a message in RFC822 format.
@@ -292,7 +280,7 @@ class DKIM(object):
   #: The rfc4871 recommended header fields to sign
   #: @since: 0.5
   SHOULD = (
-    b'sender', b'reply-to', b'subject', b'date', b'message-id', b'to', b'cc',
+    b'sender', b'reply-to', b'subject', b'date', b'from', b'message-id', b'to', b'cc',
     b'mime-version', b'content-type', b'content-transfer-encoding',
     b'content-id', b'content- description', b'resent-date', b'resent-from',
     b'resent-sender', b'resent-to', b'resent-cc', b'resent-message-id',
@@ -389,6 +377,33 @@ class DKIM(object):
     @since: 0.5"""
     return [x for x,y in self.headers if x.lower() not in self.should_not_sign]
 
+  def set_ams_headers(self):
+    """Return header list to sign in the ARC Message Signature."""
+    headers = list(DKIM.SHOULD)
+    sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-authentication-results"]
+    instances = len(sigheaders)
+    for i in xrange(1, instances):
+        headers.append(b'arc-authentication-results')
+    sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"dkim-signature"]
+    instances = len(sigheaders)
+    for i in xrange(1, instances):
+        headers.append(b'dkim-signature')
+    headers = tuple(headers)
+    return headers
+
+  def set_aseal_headers(self):
+    sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
+    instances = len(sigheaders)
+    headers = list()
+    for i in xrange(0, instances-2):
+        headers.append(b'arc-seal')
+        headers.append(b'arc-message-signature')
+        headers.append(b'arc-seal')
+    headers.append(b'arc-message-signature')
+    headers.append(b'arc-authentication-results')
+    headers = tuple(headers)
+    return headers
+
   #: Sign an RFC822 message and return the DKIM-Signature header line.
   #:
   #: The include_headers option gives full control over which header fields
@@ -425,7 +440,8 @@ class DKIM(object):
   #: @raise DKIMException: when the message, include_headers, or key are badly
   #: formed.
   def sign(self, selector, domain, privkey, identity=None,
-        canonicalize=(b'relaxed',b'simple'), include_headers=None, length=False):
+        canonicalize=(b'relaxed',b'relaxed'), include_headers=None, length=False,
+        sign_type=Signature.dkim, cv=None):
     try:
         pk = parse_pem_private_key(privkey)
     except UnparsableKeyError as e:
@@ -439,17 +455,22 @@ class DKIM(object):
     headers = canon_policy.canonicalize_headers(self.headers)
 
     if include_headers is None:
-        include_headers = self.default_sign_headers()
+        if sign_type is Signature.dkim:
+            include_headers = self.default_sign_headers()
+        elif sign_type is Signature.ams:
+            include_headers = self.set_ams_headers()
+        elif sign_type is Signature.aseal:
+            include_headers = self.set_aseal_headers()
+        else:
+            raise InvalidSignatureTypeError
 
     # rfc4871 says FROM is required
-    if b'from' not in ( x.lower() for x in include_headers ):
-        raise ParameterError("The From header field MUST be signed")
-
-    # raise exception for any SHOULD_NOT headers, call can modify 
-    # SHOULD_NOT if really needed.
-    for x in include_headers:
-        if x.lower() in self.should_not_sign:
-            raise ParameterError("The %s header field SHOULD NOT be signed"%x)
+    if sign_type is not Signature.aseal:
+        if b'from' not in ( x.lower() for x in include_headers ):
+            raise ParameterError("The From header field MUST be signed")
+        for x in include_headers:
+            if x.lower() in self.should_not_sign:
+                raise ParameterError("The %s header field SHOULD NOT be signed"%x)
 
     body = canon_policy.canonicalize_body(self.body)
 
@@ -458,33 +479,61 @@ class DKIM(object):
     h.update(body)
     bodyhash = base64.b64encode(h.digest())
 
+    # Set the sigfields.
+    sigfields = list()
     sigfields = [x for x in [
-        (b'v', b"1"),
         (b'a', self.signature_algorithm),
-        (b'c', canon_policy.to_c_value()),
         (b'd', domain),
-        (b'i', identity or b"@"+domain),
-        length and (b'l', len(body)),
-        (b'q', b"dns/txt"),
         (b's', selector),
         (b't', str(int(time.time())).encode('ascii')),
-        (b'h', b" : ".join(include_headers)),
-        (b'bh', bodyhash),
-        # Force b= to fold onto it's own line so that refolding after
-        # adding sig doesn't change whitespace for previous tags.
-        (b'b', b'0'*60), 
     ] if x]
+
+    if sign_type is Signature.dkim:
+        sigfields += [x for x in [
+            (b'v', b"1"),
+            (b'c', canon_policy.to_c_value()),
+            (b'i', identity or b"@"+domain),
+            (b'q', b"dns/txt"),
+            length and (b'l', len(body)),
+            (b'h', b" : ".join(include_headers)),
+            (b'bh', bodyhash),
+            (b'b', b'0'*60),
+        ] if x]
+
+    elif sign_type is Signature.ams:
+        sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-message-signature"]
+        i = len(sigheaders)+1
+        sigfields += [x for x in [
+            (b'i', str(i)),
+            (b'h', b" : ".join(include_headers)),
+            (b'bh', bodyhash),
+            (b'b', b'0'*60),
+        ] if x]
+
+    elif sign_type is Signature.aseal:
+        sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
+        i = len(sigheaders)+1
+        sigfields += [x for x in [
+            (b'i', str(i)),
+            (b'cv', cv),
+            (b'b', b'0'*60),
+        ] if x]
     include_headers = [x.lower() for x in include_headers]
     # record what verify should extract
     self.include_headers = tuple(include_headers)
 
     sig_value = fold(b"; ".join(b"=".join(x) for x in sigfields))
     sig_value = RE_BTAG.sub(b'\\1',sig_value)
-    dkim_header = (b'DKIM-Signature', b' ' + sig_value)
+    if sign_type is Signature.dkim:
+        sign_header = (b'DKIM-Signature', b' ' + sig_value)
+    elif sign_type is Signature.ams:
+        sign_header = (b'ARC-Message-Signature', b' ' + sig_value)
+    elif sign_type is Signature.aseal:
+        sign_header = (b'ARC-Seal', b' ' + sig_value)
     h = hasher()
     sig = dict(sigfields)
     self.signed_headers = hash_headers(
-        h, canon_policy, headers, include_headers, dkim_header,sig)
+        h, canon_policy, headers, include_headers, sign_header,sig)
     self.logger.debug("sign headers: %r" % self.signed_headers)
 
     try:
@@ -501,7 +550,12 @@ class DKIM(object):
     self.domain = domain
     self.selector = selector
     self.signature_fields = sig
-    return b'DKIM-Signature: ' + sig_value + b"\r\n"
+    if sign_type is Signature.dkim:
+        return b'DKIM-Signature: ' + sig_value + b"\r\n"
+    elif sign_type is Signature.ams:
+        return b'ARC-Message-Signature: ' + sig_value + b"\r\n"
+    else:
+        return b'ARC-Seal: ' + sig_value + b"\r\n"
 
   #: Verify a DKIM signature.
   #: @type idx: int
@@ -511,13 +565,22 @@ class DKIM(object):
   #: for a DNS domain.  The default uses dnspython or pydns.
   #: @return: True if signature verifies or False otherwise
   #: @raise DKIMException: when the message, signature, or key are badly formed
-  def verify(self,idx=0,dnsfunc=get_txt):
+  def verify(self,message=None,idx=0,sign_type=Signature.dkim,dnsfunc=get_txt):
+    if message:
+        self.set_message(message)
+    if sign_type is Signature.dkim:
+        sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"dkim-signature"]
+    elif sign_type is Signature.ams:
+        sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-message-signature"]
+    elif sign_type is Signature.aseal:
+        sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
+    else:
+        raise InvalidSignatureTypeError
 
-    sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"dkim-signature"]
     if len(sigheaders) <= idx:
         return False
 
-    # By default, we validate the first DKIM-Signature line found.
+    # By default, we validate the first Signature line found.
     try:
         sig = parse_tag_value(sigheaders[idx][1])
         self.signature_fields = sig
@@ -527,14 +590,17 @@ class DKIM(object):
     logger = self.logger
     logger.debug("sig: %r" % sig)
 
-    validate_signature_fields(sig)
+    validate_signature_fields(sig, sign_type)
     self.domain = sig[b'd']
     self.selector = sig[b's']
 
-    try:
-        canon_policy = CanonicalizationPolicy.from_c_value(sig.get(b'c'))
-    except InvalidCanonicalizationPolicyError as e:
-        raise MessageFormatError("invalid c= value: %s" % e.args[0])
+    if b'c' in sig:
+        try:
+            canon_policy = CanonicalizationPolicy.from_c_value(sig.get(b'c'))
+        except InvalidCanonicalizationPolicyError as e:
+            raise MessageFormatError("invalid c= value: %s" % e.args[0])
+    else:
+        canon_policy = CanonicalizationPolicy.from_c_value('relaxed/relaxed')
     headers = canon_policy.canonicalize_headers(self.headers)
     body = canon_policy.canonicalize_body(self.body)
 
@@ -546,18 +612,20 @@ class DKIM(object):
     if b'l' in sig:
         body = body[:int(sig[b'l'])]
 
-    h = hasher()
-    h.update(body)
-    bodyhash = h.digest()
-    logger.debug("bh: %s" % base64.b64encode(bodyhash))
-    try:
-        bh = base64.b64decode(re.sub(br"\s+", b"", sig[b'bh']))
-    except TypeError as e:
-        raise MessageFormatError(str(e))
-    if bodyhash != bh:
-        raise ValidationError(
-            "body hash mismatch (got %s, expected %s)" %
-            (base64.b64encode(bodyhash), sig[b'bh']))
+    # The ARC Seal does not contain the bodyhash.
+    if sign_type is not Signature.aseal:
+        h = hasher()
+        h.update(body)
+        bodyhash = h.digest()
+        logger.debug("bh: %s" % base64.b64encode(bodyhash))
+        try:
+            bh = base64.b64decode(re.sub(br"\s+", b"", sig[b'bh']))
+        except TypeError as e:
+            raise MessageFormatError(str(e))
+        if bodyhash != bh:
+            raise ValidationError(
+                "body hash mismatch (got %s, expected %s)" %
+                (base64.b64encode(bodyhash), sig[b'bh']))
 
     name = sig[b's'] + b"._domainkey." + sig[b'd'] + b"."
     s = dnsfunc(name)
@@ -576,7 +644,11 @@ class DKIM(object):
         raise KeyFormatError("incomplete public key: %s" % s)
     except (TypeError,UnparsableKeyError) as e:
         raise KeyFormatError("could not parse public key (%s): %s" % (pub[b'p'],e))
-    include_headers = [x.lower() for x in re.split(br"\s*:\s*", sig[b'h'])]
+
+    if sign_type is Signature.aseal:
+        include_headers = self.set_aseal_headers()
+    else:
+        include_headers = [x.lower() for x in re.split(br"\s*:\s*", sig[b'h'])]
     self.include_headers = tuple(include_headers)
     # address bug#644046 by including any additional From header
     # fields when verifying.  Since there should be only one From header,
@@ -599,7 +671,8 @@ class DKIM(object):
 def sign(message, selector, domain, privkey, identity=None,
          canonicalize=(b'relaxed', b'simple'),
          signature_algorithm=b'rsa-sha256',
-         include_headers=None, length=False, logger=None):
+         include_headers=None, length=False, logger=None, sign_type=Signature.dkim,
+         cv=None):
     """Sign an RFC822 message and return the DKIM-Signature header line.
     @param message: an RFC822 formatted message (with either \\n or \\r\\n line endings)
     @param selector: the DKIM selector value for the signature
@@ -617,9 +690,10 @@ def sign(message, selector, domain, privkey, identity=None,
     d = DKIM(message,logger=logger)
     if not include_headers:
         include_headers = d.default_sign_headers()
-    return d.sign(selector, domain, privkey, identity=identity, canonicalize=canonicalize, include_headers=include_headers, length=length)
+    return d.sign(selector, domain, privkey, identity=identity, canonicalize=canonicalize, include_headers=include_headers,
+        length=length, sign_type=sign_type, cv=cv)
 
-def verify(message, logger=None, dnsfunc=get_txt, minkey=1024):
+def verify(message, logger=None, dnsfunc=get_txt, sign_type=Signature.dkim, minkey=1024):
     """Verify the first (topmost) DKIM signature on an RFC822 formatted message.
     @param message: an RFC822 formatted message (with either \\n or \\r\\n line endings)
     @param logger: a logger to which debug info will be written (default None)
@@ -627,7 +701,7 @@ def verify(message, logger=None, dnsfunc=get_txt, minkey=1024):
     """
     d = DKIM(message,logger=logger,minkey=minkey)
     try:
-        return d.verify(dnsfunc=dnsfunc)
+        return d.verify(sign_type=sign_type, dnsfunc=dnsfunc)
     except DKIMException as x:
         if logger is not None:
             logger.error("%s" % x)
