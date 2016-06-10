@@ -391,14 +391,14 @@ class DKIM(object):
     headers = tuple(headers)
     return headers
 
-  def set_aseal_headers(self):
+  def set_aseal_headers(self, idx):
     sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
     instances = len(sigheaders)
     headers = list()
-    for i in xrange(0, instances-2):
+    for i in range(1, idx):
         headers.append(b'arc-seal')
         headers.append(b'arc-message-signature')
-        headers.append(b'arc-seal')
+        headers.append(b'arc-authentication-results')
     headers.append(b'arc-message-signature')
     headers.append(b'arc-authentication-results')
     headers = tuple(headers)
@@ -460,7 +460,9 @@ class DKIM(object):
         elif sign_type is Signature.ams:
             include_headers = self.set_ams_headers()
         elif sign_type is Signature.aseal:
-            include_headers = self.set_aseal_headers()
+            sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
+            i = len(sigheaders)+1
+            include_headers = self.set_aseal_headers(i)
         else:
             raise InvalidSignatureTypeError
 
@@ -646,7 +648,8 @@ class DKIM(object):
         raise KeyFormatError("could not parse public key (%s): %s" % (pub[b'p'],e))
 
     if sign_type is Signature.aseal:
-        include_headers = self.set_aseal_headers()
+        instance = len(sigheaders) - idx
+        include_headers = self.set_aseal_headers(instance)
     else:
         include_headers = [x.lower() for x in re.split(br"\s*:\s*", sig[b'h'])]
     self.include_headers = tuple(include_headers)
