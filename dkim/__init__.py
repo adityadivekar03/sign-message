@@ -396,11 +396,11 @@ class DKIM(object):
     instances = len(sigheaders)
     headers = list()
     for i in range(1, idx):
-        headers.append(b'arc-seal')
-        headers.append(b'arc-message-signature')
         headers.append(b'arc-authentication-results')
-    headers.append(b'arc-message-signature')
+        headers.append(b'arc-message-signature')
+        headers.append(b'arc-seal')
     headers.append(b'arc-authentication-results')
+    headers.append(b'arc-message-signature')
     headers = tuple(headers)
     return headers
 
