@@ -507,6 +507,7 @@ class DKIM(object):
         i = len(sigheaders)+1
         sigfields += [x for x in [
             (b'i', str(i)),
+            (b'c', b"relaxed/relaxed"),
             (b'h', b" : ".join(include_headers)),
             (b'bh', bodyhash),
             (b'b', b'0'*60),
