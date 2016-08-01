@@ -57,6 +57,7 @@ __all__ = [
     "KeyFormatError",
     "MessageFormatError",
     "ParameterError",
+    "InvalidSignatureTypeError",
     "Relaxed",
     "Simple",
     "DKIM",
@@ -89,6 +90,10 @@ class MessageFormatError(DKIMException):
 
 class ParameterError(DKIMException):
     """Input parameter error."""
+    pass
+
+class InvalidSignatureTypeError(DKIMException):
+    """Incorrect signature type error."""
     pass
 
 class ValidationError(DKIMException):
@@ -154,6 +159,9 @@ def validate_signature_fields(sig, sign_type = Signature.dkim):
         mandatory_fields = (b'i', b'a', b'b', b'bh', b'd', b'h', b's')
     elif sign_type is Signature.aseal:
         mandatory_fields = (b'i', b'a', b'b', b'd', b's', b'cv')
+    else:
+        raise InvalidSignatureTypeError
+
     for field in mandatory_fields:
         if field not in sig:
             raise ValidationError("signature missing %s=" % field)
@@ -521,6 +529,7 @@ class DKIM(object):
             (b'cv', cv),
             (b'b', b'0'*60),
         ] if x]
+
     include_headers = [x.lower() for x in include_headers]
     # record what verify should extract
     self.include_headers = tuple(include_headers)
@@ -557,7 +566,7 @@ class DKIM(object):
         return b'DKIM-Signature: ' + sig_value + b"\r\n"
     elif sign_type is Signature.ams:
         return b'ARC-Message-Signature: ' + sig_value + b"\r\n"
-    else:
+    elif sign_type is Signature.aseal:
         return b'ARC-Seal: ' + sig_value + b"\r\n"
 
   #: Verify a DKIM signature.
@@ -691,6 +700,8 @@ def sign(message, selector, domain, privkey, identity=None,
     @raise DKIMException: when the message, include_headers, or key are badly formed.
     """
 
+    if sign_type not in Signature:
+        raise InvalidSignatureTypeError
     d = DKIM(message,logger=logger)
     if not include_headers:
         include_headers = d.default_sign_headers()
@@ -703,6 +714,9 @@ def verify(message, logger=None, dnsfunc=get_txt, sign_type=Signature.dkim, mink
     @param logger: a logger to which debug info will be written (default None)
     @return: True if signature verifies or False otherwise
     """
+
+    if sign_type not in Signature:
+        raise InvalidSignatureTypeError
     d = DKIM(message,logger=logger,minkey=minkey)
     try:
         return d.verify(sign_type=sign_type, dnsfunc=dnsfunc)
