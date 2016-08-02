@@ -102,7 +102,7 @@ class CanonicalizationPolicy:
         May raise an C{InvalidCanonicalizationPolicyError} if the given
         value is invalid
 
-        @param c: c= value from a DKIM-Signature header field
+        @param c: c= value from a DKIM/ARC-Signature header field
         @return: a C{CanonicalizationPolicy}
         """
         if c is None:

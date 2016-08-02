@@ -146,7 +146,7 @@ def hash_headers(hasher, canonicalize_headers, headers, include_headers,
     return sign_headers
 
 def validate_signature_fields(sig, sign_type = Signature.dkim):
-    """Validate DKIM-Signature fields.
+    """Validate Signature fields.
 
     Basic checks for presence and correct formatting of mandatory fields.
     Raises a ValidationError if checks fail, otherwise returns None.
@@ -263,7 +263,7 @@ def fold(header):
         header = header[j:]
     return pre + header
 
-#: Hold messages and options during DKIM signing and verification.
+#: Hold messages and options during signing and verification.
 class DKIM(object):
   # NOTE - the first 2 indentation levels are 2 instead of 4 
   # to minimize changed lines from the function only version.
@@ -354,12 +354,12 @@ class DKIM(object):
       self.headers, self.body = rfc822_parse(message)
     else:
       self.headers, self.body = [],''
-    #: The DKIM signing domain last signed or verified.
+    #: The signing domain last signed or verified.
     self.domain = None
-    #: The DKIM key selector last signed or verified.
+    #: The key selector last signed or verified.
     self.selector = 'default'
     #: Signature parameters of last sign or verify.  To parse
-    #: a DKIM-Signature header field that you have in hand,
+    #: a Signature header field that you have in hand,
     #: use L{dkim.util.parse_tag_value}.
     self.signature_fields = {}
     #: The list of headers last signed or verified.  Each header
@@ -400,6 +400,7 @@ class DKIM(object):
     return headers
 
   def set_aseal_headers(self, idx):
+    """Return header list to sign/verify in the ARC Seal."""
     sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
     instances = len(sigheaders)
     headers = list()
@@ -412,7 +413,9 @@ class DKIM(object):
     headers = tuple(headers)
     return headers
 
-  #: Sign an RFC822 message and return the DKIM-Signature header line.
+  #: Sign an RFC822 message and return the Signature header line.
+  #: The Signature may be either the DKIM-Signature, ARC-Message-Signature
+  #: or the ARC-Seal depending upon the sign_type parameter.
   #:
   #: The include_headers option gives full control over which header fields
   #: are signed.  Note that signing a header field that doesn't exist prevents
@@ -420,7 +423,9 @@ class DKIM(object):
   #: fields (such as Received) can be signed multiple times.  Instances
   #: of the field are signed from bottom to top.  Signing a header field more
   #: times than are currently present prevents additional instances
-  #: from being added without breaking the signature.
+  #: from being added without breaking the signature. Also, note that in case
+  #: of the ARC-Seal, the include_headers parameter must be left empty since
+  #: for ARC-Seal the headers are implicit.
   #:
   #: The length option allows the message body to be appended to by MTAs
   #: enroute (e.g. mailing lists that append unsubscribe information)
@@ -433,10 +438,10 @@ class DKIM(object):
   #: It is only necessary to pass an include_headers list when precise control
   #: is needed.
   #:
-  #: @param selector: the DKIM selector value for the signature
-  #: @param domain: the DKIM domain value for the signature
+  #: @param selector: the DKIM/ARC selector value for the signature
+  #: @param domain: the DKIM/ARC domain value for the signature
   #: @param privkey: a PKCS#1 private key in base64-encoded text form
-  #: @param identity: the DKIM identity value for the signature
+  #: @param identity: the DKIM/ARC identity value for the signature
   #: (default "@"+domain)
   #: @param canonicalize: the canonicalization algorithms to use
   #: (default (Simple, Simple))
@@ -444,7 +449,10 @@ class DKIM(object):
   #: are to be signed (default rfc4871 recommended headers)
   #: @param length: true if the l= tag should be included to indicate
   #: body length signed (default False).
-  #: @return: DKIM-Signature header field terminated by '\r\n'
+  #: @param sign_type: the type of signature - DKIM, AMS or AS, being crafted.
+  #: @param cv: the chain validation status for the received ARC chain. To be
+  #: specified only when signing the ARC-Seal.
+  #: @return: DKIM/AMS/AS-Signature header field terminated by '\r\n'
   #: @raise DKIMException: when the message, include_headers, or key are badly
   #: formed.
   def sign(self, selector, domain, privkey, identity=None,
@@ -569,9 +577,10 @@ class DKIM(object):
     elif sign_type is Signature.aseal:
         return b'ARC-Seal: ' + sig_value + b"\r\n"
 
-  #: Verify a DKIM signature.
+  #: Verify a DKIM/ARC signature.
   #: @type idx: int
   #: @param idx: which signature to verify.  The first (topmost) signature is 0.
+  #: @param sign_type: the type of signature - DKIM, AMS or AS, being crafted.
   #: @type dnsfunc: callable
   #: @param dnsfunc: an option function to lookup TXT resource records
   #: for a DNS domain.  The default uses dnspython or pydns.
@@ -686,17 +695,20 @@ def sign(message, selector, domain, privkey, identity=None,
          signature_algorithm=b'rsa-sha256',
          include_headers=None, length=False, logger=None, sign_type=Signature.dkim,
          cv=None):
-    """Sign an RFC822 message and return the DKIM-Signature header line.
+    """Sign an RFC822 message and return the DKIM/AMS/AS-Signature header line.
     @param message: an RFC822 formatted message (with either \\n or \\r\\n line endings)
-    @param selector: the DKIM selector value for the signature
-    @param domain: the DKIM domain value for the signature
+    @param selector: the DKIM/ARC selector value for the signature
+    @param domain: the DKIM/ARC domain value for the signature
     @param privkey: a PKCS#1 private key in base64-encoded text form
-    @param identity: the DKIM identity value for the signature (default "@"+domain)
+    @param identity: the DKIM/ARC identity value for the signature (default "@"+domain)
     @param canonicalize: the canonicalization algorithms to use (default (Simple, Simple))
     @param include_headers: a list of strings indicating which headers are to be signed (default all headers not listed as SHOULD NOT sign)
     @param length: true if the l= tag should be included to indicate body length (default False)
     @param logger: a logger to which debug info will be written (default None)
-    @return: DKIM-Signature header field terminated by \\r\\n
+    @param sign_type: the type of signature - DKIM, AMS or AS, being crafted.
+    @param cv: the chain validation status for the received ARC chain. To be
+    specified only when signing the ARC-Seal.
+    @return: DKIM/AMS/AS-Signature header field terminated by \\r\\n
     @raise DKIMException: when the message, include_headers, or key are badly formed.
     """
 
@@ -711,6 +723,7 @@ def sign(message, selector, domain, privkey, identity=None,
 def verify(message, logger=None, dnsfunc=get_txt, sign_type=Signature.dkim, minkey=1024):
     """Verify the first (topmost) DKIM signature on an RFC822 formatted message.
     @param message: an RFC822 formatted message (with either \\n or \\r\\n line endings)
+    @param sign_type: the type of signature - DKIM, AMS or AS, being crafted.
     @param logger: a logger to which debug info will be written (default None)
     @return: True if signature verifies or False otherwise
     """
