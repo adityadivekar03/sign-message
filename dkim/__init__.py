@@ -444,7 +444,7 @@ class DKIM(object):
   #: @param identity: the DKIM/ARC identity value for the signature
   #: (default "@"+domain)
   #: @param canonicalize: the canonicalization algorithms to use
-  #: (default (Simple, Simple))
+  #: (default (Relaxed, Relaxed))
   #: @param include_headers: a list of strings indicating which headers
   #: are to be signed (default rfc4871 recommended headers)
   #: @param length: true if the l= tag should be included to indicate
@@ -564,7 +564,7 @@ class DKIM(object):
     #sig_value += base64.b64encode(bytes(sig2))
     # Instead of leaving unfolded (which lets an MTA fold it later and still
     # breaks yahoo and live.com), we change the default signing mode to
-    # relaxed/simple (for broken receivers), and fold now.
+    # relaxed/relaxed (for broken receivers), and fold now.
     sig_value = fold(sig_value + base64.b64encode(bytes(sig2)))
 
     self.domain = domain
@@ -691,7 +691,7 @@ class DKIM(object):
         raise KeyFormatError("digest too large for modulus: %s"%e)
 
 def sign(message, selector, domain, privkey, identity=None,
-         canonicalize=(b'relaxed', b'simple'),
+         canonicalize=(b'relaxed', b'relaxed'),
          signature_algorithm=b'rsa-sha256',
          include_headers=None, length=False, logger=None, sign_type=Signature.dkim,
          cv=None):
@@ -701,7 +701,7 @@ def sign(message, selector, domain, privkey, identity=None,
     @param domain: the DKIM/ARC domain value for the signature
     @param privkey: a PKCS#1 private key in base64-encoded text form
     @param identity: the DKIM/ARC identity value for the signature (default "@"+domain)
-    @param canonicalize: the canonicalization algorithms to use (default (Simple, Simple))
+    @param canonicalize: the canonicalization algorithms to use (default (Relaxed, Relaxed))
     @param include_headers: a list of strings indicating which headers are to be signed (default all headers not listed as SHOULD NOT sign)
     @param length: true if the l= tag should be included to indicate body length (default False)
     @param logger: a logger to which debug info will be written (default None)
