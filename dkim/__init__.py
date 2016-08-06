@@ -712,8 +712,6 @@ def sign(message, selector, domain, privkey, identity=None,
     @raise DKIMException: when the message, include_headers, or key are badly formed.
     """
 
-    if sign_type not in Signature:
-        raise InvalidSignatureTypeError
     d = DKIM(message,logger=logger)
     if not include_headers:
         include_headers = d.default_sign_headers()
@@ -728,8 +726,6 @@ def verify(message, logger=None, dnsfunc=get_txt, sign_type=Signature.dkim, mink
     @return: True if signature verifies or False otherwise
     """
 
-    if sign_type not in Signature:
-        raise InvalidSignatureTypeError
     d = DKIM(message,logger=logger,minkey=minkey)
     try:
         return d.verify(sign_type=sign_type, dnsfunc=dnsfunc)
