@@ -127,7 +127,7 @@ def asn1_build(node):
         return asn1_encode(OCTET_STRING, node[1])
     if node[0] == NULL:
         assert node[1] is None
-        return asn1_encode(NULL, b'')
+        return asn1_encode(NULL, '')
     elif node[0] == OBJECT_IDENTIFIER:
         return asn1_encode(OBJECT_IDENTIFIER, node[1])
     elif node[0] == SEQUENCE:
