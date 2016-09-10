@@ -41,11 +41,11 @@ def compress_whitespace(content):
 
 
 def strip_trailing_lines(content):
-    return re.sub(b"(\r\n)*$", "\r\n", content)
+    return re.sub("(\r\n)*$", "\r\n", content)
 
 
 def unfold_header_value(content):
-    return re.sub(b"\r\n", "", content)
+    return re.sub("\r\n", "", content)
 
 
 class Simple:
