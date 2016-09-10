@@ -504,7 +504,7 @@ class DKIM(object):
         ('a', self.signature_algorithm),
         ('d', domain),
         ('s', selector),
-        ('t', str(int(time.time())).encode('ascii')),
+        ('t', str(int(time.time()))),
     ] if x]
 
     if sign_type is Signature.dkim:
