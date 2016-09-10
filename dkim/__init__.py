@@ -494,6 +494,7 @@ class DKIM(object):
 
     hasher = HASH_ALGORITHMS[self.signature_algorithm]
     h = hasher()
+    body.encode('utf-8')
     h.update(body)
     bodyhash = base64.b64encode(h.digest())
 
