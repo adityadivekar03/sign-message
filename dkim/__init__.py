@@ -140,9 +140,9 @@ def hash_headers(hasher, canonicalize_headers, headers, include_headers,
     # the dkim sig is hashed with no trailing crlf, even if the
     # canonicalization algorithm would add one.
     for x,y in sign_headers + [(x, y.rstrip()) for x,y in cheaders]:
-        hasher.update(x)
+        hasher.update(x.encode('ascii'))
         hasher.update(":")
-        hasher.update(y)
+        hasher.update(y.encode('ascii'))
     return sign_headers
 
 def validate_signature_fields(sig, sign_type = Signature.dkim):
