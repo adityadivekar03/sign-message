@@ -33,25 +33,25 @@ class InvalidCanonicalizationPolicyError(Exception):
 
 
 def strip_trailing_whitespace(content):
-    return re.sub(b"[\t ]+\r\n", b"\r\n", content)
+    return re.sub("[\t ]+\r\n", "\r\n", content)
 
 
 def compress_whitespace(content):
-    return re.sub(b"[\t ]+", b" ", content)
+    return re.sub("[\t ]+", " ", content)
 
 
 def strip_trailing_lines(content):
-    return re.sub(b"(\r\n)*$", b"\r\n", content)
+    return re.sub(b"(\r\n)*$", "\r\n", content)
 
 
 def unfold_header_value(content):
-    return re.sub(b"\r\n", b"", content)
+    return re.sub(b"\r\n", "", content)
 
 
 class Simple:
     """Class that represents the "simple" canonicalization algorithm."""
 
-    name = b"simple"
+    name = "simple"
 
     @staticmethod
     def canonicalize_headers(headers):
@@ -67,7 +67,7 @@ class Simple:
 class Relaxed:
     """Class that represents the "relaxed" canonicalization algorithm."""
 
-    name = b"relaxed"
+    name = "relaxed"
 
     @staticmethod
     def canonicalize_headers(headers):
@@ -77,7 +77,7 @@ class Relaxed:
         # Remove all WSP at the start or end of the field value (strip).
         return [
             (x[0].lower().rstrip(),
-             compress_whitespace(unfold_header_value(x[1])).strip() + b"\r\n")
+             compress_whitespace(unfold_header_value(x[1])).strip() + "\r\n")
             for x in headers]
 
     @staticmethod
@@ -106,12 +106,12 @@ class CanonicalizationPolicy:
         @return: a C{CanonicalizationPolicy}
         """
         if c is None:
-            c = b'simple/simple'
-        m = c.split(b'/')
+            c = 'simple/simple'
+        m = c.split('/')
         if len(m) not in (1, 2):
             raise InvalidCanonicalizationPolicyError(c)
         if len(m) == 1:
-            m.append(b'simple')
+            m.append('simple')
         can_headers, can_body = m
         try:
             header_algorithm = ALGORITHMS[can_headers]
@@ -121,7 +121,7 @@ class CanonicalizationPolicy:
         return cls(header_algorithm, body_algorithm)
 
     def to_c_value(self):
-        return b'/'.join(
+        return '/'.join(
             (self.header_algorithm.name, self.body_algorithm.name))
 
     def canonicalize_headers(self, headers):

@@ -31,7 +31,7 @@ def get_txt_dnspython(name):
       a = dns.resolver.query(name, dns.rdatatype.TXT,raise_on_no_answer=False)
       for r in a.response.answer:
           if r.rdtype == dns.rdatatype.TXT:
-              return b"".join(r.items[0].strings)
+              return "".join(r.items[0].strings)
     except dns.resolver.NXDOMAIN: pass
     return None
 
@@ -44,7 +44,7 @@ def get_txt_pydns(name):
     response = DNS.DnsRequest(name, qtype='txt').req()
     if not response.answers:
         return None
-    return b''.join(response.answers[0]['data'])
+    return ''.join(response.answers[0]['data'])
 
 def get_txt_Milter_dns(name):
     """Return a TXT record associated with a DNS name."""
@@ -53,7 +53,7 @@ def get_txt_Milter_dns(name):
         name = name[:-1]
     sess = Session()
     a = sess.dns(name,'TXT')
-    if a: return b''.join(a[0])
+    if a: return ''.join(a[0])
     return None
 
 # Prefer dnspython if it's there, otherwise use pydns.
