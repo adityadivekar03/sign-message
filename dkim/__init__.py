@@ -200,7 +200,7 @@ def rfc822_parse(message):
     The body is a CRLF-separated string.
     """
     headers = []
-    lines = re.split(b"\r?\n", message)
+    lines = re.split("\r?\n", message)
     i = 0
     while i < len(lines):
         if len(lines[i]) == 0:
