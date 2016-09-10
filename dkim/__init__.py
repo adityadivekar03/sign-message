@@ -25,7 +25,7 @@ import logging
 import re
 import time
 
-from types import Signature
+from dkim.types import Signature
 
 from dkim.canonicalization import (
     CanonicalizationPolicy,
