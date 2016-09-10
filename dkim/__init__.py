@@ -141,7 +141,7 @@ def hash_headers(hasher, canonicalize_headers, headers, include_headers,
     # canonicalization algorithm would add one.
     for x,y in sign_headers + [(x, y.rstrip()) for x,y in cheaders]:
         hasher.update(x.encode('ascii'))
-        hasher.update(":")
+        hasher.update(":".encode('ascii'))
         hasher.update(y.encode('ascii'))
     return sign_headers
 
