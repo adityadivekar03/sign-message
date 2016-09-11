@@ -545,7 +545,9 @@ class DKIM(object):
     for x in sigfields:
       print('One tuple')
       print(type(x[0]))
+      print(x[0])
       print(type(x[1]))
+      print(x[1])
     sig_value = fold("; ".join("=".join(x) for x in sigfields))
     sig_value = RE_BTAG.sub('\\1',sig_value)
     if sign_type is Signature.dkim:
