@@ -681,7 +681,7 @@ class DKIM(object):
     self.signed_headers = hash_headers(
         h, canon_policy, headers, include_headers, sigheaders[idx], sig)
     try:
-        signature = base64.b64decode(re.sub(br"\s+", b"", str.encode(sig[b'b'])))
+        signature = base64.b64decode(re.sub(br"\s+", b"", sig[b'b']))
         res = RSASSA_PKCS1_v1_5_verify(h, signature, pk)
         if res and self.keysize < self.minkey:
           raise KeyFormatError("public key too small: %d" % self.keysize)
