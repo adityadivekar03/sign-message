@@ -543,7 +543,9 @@ class DKIM(object):
     # record what verify should extract
     self.include_headers = tuple(include_headers)
     for x in sigfields:
-      print(type(x))
+      print('One tuple')
+      print(type(x[0]))
+      print(type(x[1]))
     sig_value = fold("; ".join("=".join(x) for x in sigfields))
     sig_value = RE_BTAG.sub('\\1',sig_value)
     if sign_type is Signature.dkim:
