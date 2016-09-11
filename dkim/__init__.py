@@ -522,7 +522,7 @@ class DKIM(object):
         sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-message-signature"]
         i = len(sigheaders)+1
         sigfields += [x for x in [
-            (b'i', str(i)),
+            (b'i', str.encode(i)),
             (b'c', b"relaxed/relaxed"),
             (b'h', b" : ".join(include_headers)),
             (b'bh', bodyhash),
@@ -533,8 +533,8 @@ class DKIM(object):
         sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
         i = len(sigheaders)+1
         sigfields += [x for x in [
-            (b'i', str(i)),
-            (b'cv', cv),
+            (b'i', str.encode(i)),
+            (b'cv', str.encode(cv)),
             (b'b', b'0'*60),
         ] if x]
 
