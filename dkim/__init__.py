@@ -515,7 +515,7 @@ class DKIM(object):
             ('q', "dns/txt"),
             length and ('l', len(body)),
             ('h', " : ".join(include_headers)),
-            ('bh', bodyhash),
+            ('bh', str(bodyhash)),
             ('b', '0'*60),
         ] if x]
 
@@ -526,7 +526,7 @@ class DKIM(object):
             ('i', str(i)),
             ('c', "relaxed/relaxed"),
             ('h', " : ".join(include_headers)),
-            ('bh', bodyhash),
+            ('bh', str(bodyhash)),
             ('b', '0'*60),
         ] if x]
 
