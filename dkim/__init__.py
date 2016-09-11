@@ -168,14 +168,14 @@ def validate_signature_fields(sig, sign_type = Signature.dkim):
 
     if b'v' in sig and sig[b'v'] != b"1":
         raise ValidationError("v= value is not 1 (%s)" % sig[b'v'])
-    if re.match(br"[\s0-9A-Za-z+/]+=*$", str.encode(sig[b'b'])) is None:
+    if re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'b']) is None:
         raise ValidationError("b= value is not valid base64 (%s)" % sig[b'b'])
-    if b'bh' in sig and re.match(br"[\s0-9A-Za-z+/]+=*$", str.encode(sig[b'bh'])) is None:
+    if b'bh' in sig and re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'bh']) is None:
         raise ValidationError(
             "bh= value is not valid base64 (%s)" % sig[b'bh'])
     # Nasty hack to support both str and bytes... check for both the
     # character and integer values.
-    if b'l' in sig and re.match(br"\d{,76}$", str.encode(sig[b'l'])) is None:
+    if b'l' in sig and re.match(br"\d{,76}$", sig[b'l']) is None:
         raise ValidationError(
             "l= value is not a decimal integer (%s)" % sig[b'l'])
     if b'q' in sig and sig[b'q'] != b"dns/txt":
@@ -184,7 +184,7 @@ def validate_signature_fields(sig, sign_type = Signature.dkim):
     slop = 36000		# 10H leeway for mailers with inaccurate clocks
     t_sign = 0
     if b't' in sig:
-        if re.match(br"\d+$", str.encode(sig[b't'])) is None:
+        if re.match(br"\d+$", sig[b't']) is None:
             raise ValidationError(
         	"t= value is not a decimal integer (%s)" % sig[b't'])
         t_sign = int(sig[b't'])
