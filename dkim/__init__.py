@@ -669,7 +669,7 @@ class DKIM(object):
         instance = len(sigheaders) - idx
         include_headers = self.set_aseal_headers(instance)
     else:
-        include_headers = [x.lower() for x in re.split(br"\s*:\s*", str.encode(sig[b'h']))]
+        include_headers = [x.lower() for x in re.split(br"\s*:\s*", sig[b'h'])]
     self.include_headers = tuple(include_headers)
     # address bug#644046 by including any additional From header
     # fields when verifying.  Since there should be only one From header,
