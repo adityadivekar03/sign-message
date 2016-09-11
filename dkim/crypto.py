@@ -150,7 +150,7 @@ def parse_pem_private_key(data):
     @param data: RFC3447 RSAPrivateKey in PEM format.
     @return: RSA private key
     """
-    m = re.search(b"--\n(.*?)\n--", data, re.DOTALL)
+    m = re.search(b"--\n(.*?)\n--", str.encode(data), re.DOTALL)
     if m is None:
         raise UnparsableKeyError("Private key not found")
     try:
