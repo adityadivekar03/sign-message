@@ -496,7 +496,9 @@ class DKIM(object):
     h = hasher()
     h.update(body)
     bodyhash = base64.b64encode(h.digest())
-
+    for x in include_headers:
+      print(type(x))
+      print(x)
     # Set the sigfields.
     sigfields = list()
     sigfields = [x for x in [
