@@ -200,7 +200,7 @@ def rfc822_parse(message):
     The body is a CRLF-separated string.
     """
     headers = []
-    lines = re.split(b"\r?\n", message)
+    lines = re.split(b"\r?\n", str.encode(message))
     i = 0
     while i < len(lines):
         if len(lines[i]) == 0:
@@ -292,7 +292,7 @@ class DKIM(object):
     b'mime-version', b'content-type', b'content-transfer-encoding',
     b'content-id', b'content- description', b'resent-date', b'resent-from',
     b'resent-sender', b'resent-to', b'resent-cc', b'resent-message-id',
-    b'in-reply-to', 'references', b'list-id', b'list-help', b'list-unsubscribe',
+    b'in-reply-to', b'references', b'list-id', b'list-help', b'list-unsubscribe',
     b'list-subscribe', b'list-post', b'list-owner', b'list-archive'
   )
 
@@ -390,11 +390,11 @@ class DKIM(object):
     headers = list(DKIM.SHOULD)
     sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-authentication-results"]
     instances = len(sigheaders)
-    for i in xrange(1, instances):
+    for i in range(1, instances):
         headers.append(b'arc-authentication-results')
     sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"dkim-signature"]
     instances = len(sigheaders)
-    for i in xrange(1, instances):
+    for i in range(1, instances):
         headers.append(b'dkim-signature')
     headers = tuple(headers)
     return headers
@@ -496,7 +496,6 @@ class DKIM(object):
     h = hasher()
     h.update(body)
     bodyhash = base64.b64encode(h.digest())
-
     # Set the sigfields.
     sigfields = list()
     sigfields = [x for x in [
@@ -522,7 +521,7 @@ class DKIM(object):
         sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-message-signature"]
         i = len(sigheaders)+1
         sigfields += [x for x in [
-            (b'i', str(i)),
+            (b'i', str.encode(str(i))),
             (b'c', b"relaxed/relaxed"),
             (b'h', b" : ".join(include_headers)),
             (b'bh', bodyhash),
@@ -533,8 +532,8 @@ class DKIM(object):
         sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-seal"]
         i = len(sigheaders)+1
         sigfields += [x for x in [
-            (b'i', str(i)),
-            (b'cv', cv),
+            (b'i', str.encode(str(i))),
+            (b'cv', str.encode(str(cv))),
             (b'b', b'0'*60),
         ] if x]
 
@@ -621,7 +620,7 @@ class DKIM(object):
         except InvalidCanonicalizationPolicyError as e:
             raise MessageFormatError("invalid c= value: %s" % e.args[0])
     else:
-        canon_policy = CanonicalizationPolicy.from_c_value('relaxed/relaxed')
+        canon_policy = CanonicalizationPolicy.from_c_value(b'relaxed/relaxed')
     headers = canon_policy.canonicalize_headers(self.headers)
     body = canon_policy.canonicalize_body(self.body)
 
