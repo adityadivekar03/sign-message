@@ -390,11 +390,11 @@ class DKIM(object):
     headers = list(DKIM.SHOULD)
     sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"arc-authentication-results"]
     instances = len(sigheaders)
-    for i in xrange(1, instances):
+    for i in range(1, instances):
         headers.append(b'arc-authentication-results')
     sigheaders = [(x,y) for x,y in self.headers if x.lower() == b"dkim-signature"]
     instances = len(sigheaders)
-    for i in xrange(1, instances):
+    for i in range(1, instances):
         headers.append(b'dkim-signature')
     headers = tuple(headers)
     return headers
