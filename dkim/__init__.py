@@ -168,14 +168,14 @@ def validate_signature_fields(sig, sign_type = Signature.dkim):
 
     if b'v' in sig and sig[b'v'] != b"1":
         raise ValidationError("v= value is not 1 (%s)" % sig[b'v'])
-    if re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'b']) is None:
+    if re.match(br"[\s0-9A-Za-z+/]+=*$", str.encode(sig[b'b'])) is None:
         raise ValidationError("b= value is not valid base64 (%s)" % sig[b'b'])
-    if b'bh' in sig and re.match(br"[\s0-9A-Za-z+/]+=*$", sig[b'bh']) is None:
+    if b'bh' in sig and re.match(br"[\s0-9A-Za-z+/]+=*$", str.encode(sig[b'bh'])) is None:
         raise ValidationError(
             "bh= value is not valid base64 (%s)" % sig[b'bh'])
     # Nasty hack to support both str and bytes... check for both the
     # character and integer values.
-    if b'l' in sig and re.match(br"\d{,76}$", sig[b'l']) is None:
+    if b'l' in sig and re.match(br"\d{,76}$", str.encode(sig[b'l'])) is None:
         raise ValidationError(
             "l= value is not a decimal integer (%s)" % sig[b'l'])
     if b'q' in sig and sig[b'q'] != b"dns/txt":
@@ -184,7 +184,7 @@ def validate_signature_fields(sig, sign_type = Signature.dkim):
     slop = 36000		# 10H leeway for mailers with inaccurate clocks
     t_sign = 0
     if b't' in sig:
-        if re.match(br"\d+$", sig[b't']) is None:
+        if re.match(br"\d+$", str.encode(sig[b't'])) is None:
             raise ValidationError(
         	"t= value is not a decimal integer (%s)" % sig[b't'])
         t_sign = int(sig[b't'])
@@ -200,7 +200,7 @@ def rfc822_parse(message):
     The body is a CRLF-separated string.
     """
     headers = []
-    lines = re.split(b"\r?\n", message)
+    lines = re.split(b"\r?\n", str.encode(message))
     i = 0
     while i < len(lines):
         if len(lines[i]) == 0:
@@ -670,7 +670,7 @@ class DKIM(object):
         instance = len(sigheaders) - idx
         include_headers = self.set_aseal_headers(instance)
     else:
-        include_headers = [x.lower() for x in re.split(br"\s*:\s*", sig[b'h'])]
+        include_headers = [x.lower() for x in re.split(br"\s*:\s*", str.encode(sig[b'h']))]
     self.include_headers = tuple(include_headers)
     # address bug#644046 by including any additional From header
     # fields when verifying.  Since there should be only one From header,
@@ -682,7 +682,7 @@ class DKIM(object):
     self.signed_headers = hash_headers(
         h, canon_policy, headers, include_headers, sigheaders[idx], sig)
     try:
-        signature = base64.b64decode(re.sub(br"\s+", b"", sig[b'b']))
+        signature = base64.b64decode(re.sub(br"\s+", b"", str.encode(sig[b'b'])))
         res = RSASSA_PKCS1_v1_5_verify(h, signature, pk)
         if res and self.keysize < self.minkey:
           raise KeyFormatError("public key too small: %d" % self.keysize)
