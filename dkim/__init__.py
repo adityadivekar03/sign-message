@@ -620,7 +620,7 @@ class DKIM(object):
         except InvalidCanonicalizationPolicyError as e:
             raise MessageFormatError("invalid c= value: %s" % e.args[0])
     else:
-        canon_policy = CanonicalizationPolicy.from_c_value('relaxed/relaxed')
+        canon_policy = CanonicalizationPolicy.from_c_value(b'relaxed/relaxed')
     headers = canon_policy.canonicalize_headers(self.headers)
     body = canon_policy.canonicalize_body(self.body)
 
