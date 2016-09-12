@@ -81,5 +81,5 @@ def get_txt(name):
         return None
     txt = _get_txt(unicode_name)
     if txt:
-      txt = txt.encode('utf-8')
+      txt = txt.decode('utf-8')
     return txt
