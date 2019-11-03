@@ -10,9 +10,9 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
 	W51wBB0V6L1ZU156A9cZWQWvwnQ/lV7PV7AwRqGbIESguRLfCbM+UIAGoCR8QtTO0lkY
 	bGqPQucn+1eZZUNsEJAWFI6eo2MmxY/FABEURGYAukaTg13UC9W+O6kGPH5iS5aRpAAT eKbQ==
 MIME-Version: 1.0
-Sender: kaner.mail@gmail.com
+Sender: fake.mail@gmail.com
 Received: by 10.42.92.137 with HTTP; Sun, 9 Jun 2013 02:37:02 -0700 (PDT)
-From: Christian Fromme <cfr@strace.org>
+From: James Smithsonian <abc@strace.org>
 Date: Sun, 9 Jun 2013 11:37:02 +0200
 X-Google-Sender-Auth: ZkDaYkXZHozJZyNGgvWFlv78IRY
 Message-ID: <CABop5ezogOsxQXV1pUHCZDf-w3XpOFPsbSm8o8Lx5CRX-eq4fg@mail.gmail.com>
